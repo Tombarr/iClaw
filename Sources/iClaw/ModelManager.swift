@@ -306,7 +306,8 @@ struct WikipediaSearchTool: Tool {
         }
 
         let trimmed = extract.count > 2000 ? String(extract.prefix(2000)) + "..." : extract
-        return "\(title):\n\(trimmed)"
+        let summary = await SummarizationManager.shared.summarize(text: "\(title):\n\(trimmed)")
+        return summary
     }
 }
 
@@ -864,7 +865,7 @@ struct WeatherTool: Tool {
                 lon = location.coordinate.longitude
                 resolvedName = "your current location"
             } catch {
-                return "Failed to get current location: \(error.localizedDescription)"
+                return "I couldn't access your location. Where are you? Give me a city name and I'll get the weather."
             }
         }
 
@@ -1001,7 +1002,12 @@ struct PodcastTool: Tool {
             if let episodeId = input.episodeId, let id = Int(episodeId) {
                 return await playEpisode(episodeId: id)
             }
-            return "Provide an episodeId to play."
+            // Fall back to searching by name and playing the first result
+            let searchQuery = input.query ?? input.episodeId ?? ""
+            if !searchQuery.isEmpty {
+                return try await searchAndPlay(query: searchQuery)
+            }
+            return "Tell me the name of the episode or podcast you want to play."
         }
         
         return "Unknown action '\(action)'. Valid actions are 'search', 'episodes', or 'play'."
@@ -1117,6 +1123,21 @@ struct PodcastTool: Tool {
 
         await PodcastPlayerManager.shared.play(url: streamURL, title: title, show: show)
         return "Now playing '\(title)' from \(show). Use the player controls to pause, scrub, or stop."
+    }
+
+    private func searchAndPlay(query: String) async throws -> String {
+        let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let url = URL(string: "https://itunes.apple.com/search?term=\(encoded)&entity=podcastEpisode&limit=1")!
+        let (data, _) = try await URLSession.shared.data(from: url)
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let results = json["results"] as? [[String: Any]],
+              let ep = results.first,
+              let epId = ep["trackId"] as? Int else {
+            return "No episodes found matching '\(query)'."
+        }
+
+        return await playEpisode(episodeId: epId)
     }
 }
 
@@ -1573,17 +1594,12 @@ class ModelManager {
         - calendar/schedule/events → calendar
         - contacts/people/phone/email → contacts
         - files/documents/find file → spotlight or read_file
-        - clipboard/copy/paste → clipboard
         - reminders/todo → reminders
-        - volume/dark mode/system → system_control
-        - launch/quit/open app → app_manager
         - web search/google/look up → web_search
         - wikipedia/wiki/who is/what is → wikipedia
-        - photo/camera/selfie → camera
         - currency/convert/exchange rate → currency_converter
         - notes/note → notes
         - fetch URL/webpage → fetch
-        - health/steps/heart rate/sleep → health
         Never make up data. Always call the tool.
         """)
 
@@ -1597,10 +1613,10 @@ class ModelManager {
             LoggingTool(wrapped: CalendarTool()),
             LoggingTool(wrapped: ContactsTool()),
             LoggingTool(wrapped: SpotlightTool()),
-            LoggingTool(wrapped: ClipboardTool()),
+            // LoggingTool(wrapped: ClipboardTool()),
             LoggingTool(wrapped: RemindersTool()),
-            LoggingTool(wrapped: SystemControlTool()),
-            LoggingTool(wrapped: AppManagerTool()),
+            // LoggingTool(wrapped: SystemControlTool()),
+            // LoggingTool(wrapped: AppManagerTool()),
             LoggingTool(wrapped: SummarizeTool()),
             LoggingTool(wrapped: WeatherTool()),
             LoggingTool(wrapped: ReadFileTool()),
@@ -1608,8 +1624,8 @@ class ModelManager {
             LoggingTool(wrapped: PodcastTool()),
             LoggingTool(wrapped: NotesTool()),
             LoggingTool(wrapped: CurrencyTool()),
-            LoggingTool(wrapped: CameraTool()),
-            LoggingTool(wrapped: HealthTool()),
+            // LoggingTool(wrapped: CameraTool()),
+            // LoggingTool(wrapped: HealthTool()),
             LoggingTool(wrapped: NewsTool()),
         ]
     }
@@ -1643,20 +1659,95 @@ class ModelManager {
         return (places, people, orgs)
     }
 
+    // MARK: - Deterministic Tool Router
+
+    /// Routes based on keyword matching. Returns tool names that should be offered to the model.
+    /// Falls back to all tools if no keywords match (general question).
+    private static let toolRoutes: [(keywords: [String], toolNames: [String])] = [
+        // Weather
+        (["weather", "temperature", "forecast", "rain", "snow", "sunny", "humid", "wind", "degrees"],
+         ["weather"]),
+        // Podcasts
+        (["podcast", "podcasts", "episode", "episodes", "listen", "show", "shows"],
+         ["podcast"]),
+        // News
+        (["news", "headlines", "current events", "what's happening", "whats happening"],
+         ["news"]),
+        // Calendar
+        (["calendar", "schedule", "meeting", "meetings", "event", "events", "appointment", "busy", "free"],
+         ["calendar"]),
+        // Contacts
+        (["contact", "contacts", "phone number", "email address", "call", "phone"],
+         ["contacts"]),
+        // Reminders
+        (["remind", "reminder", "reminders", "todo", "to-do", "to do"],
+         ["reminders"]),
+        // Notes
+        (["note", "notes", "write down", "jot down", "take a note"],
+         ["notes"]),
+        // Currency
+        (["currency", "convert", "exchange rate", "dollars to", "euros to", "pounds to", "usd", "eur", "gbp", "jpy"],
+         ["currency_converter"]),
+        // Wikipedia
+        (["wikipedia", "wiki", "who is", "who was", "what is", "what was", "define", "definition"],
+         ["wikipedia"]),
+        // Web search
+        (["search", "google", "look up", "find out", "search for"],
+         ["web_search"]),
+        // Files
+        (["file", "files", "document", "documents", "find file", "open file", "desktop", "downloads"],
+         ["spotlight", "read_file"]),
+        // Fetch URL
+        (["http://", "https://", "fetch", "webpage", "website", "url"],
+         ["fetch"]),
+    ]
+
+    private func routeTools(for prompt: String) -> [any Tool] {
+        let lower = prompt.lowercased()
+        var matchedNames: Set<String> = []
+
+        for route in Self.toolRoutes {
+            if route.keywords.contains(where: { lower.contains($0) }) {
+                for name in route.toolNames {
+                    matchedNames.insert(name)
+                }
+            }
+        }
+
+        // If no keywords matched, it's a general question — give all tools
+        if matchedNames.isEmpty {
+            print("[ToolRouter] No keyword match, passing all tools")
+            return tools
+        }
+
+        // Only add web_search as fallback if no data-specific tool was matched
+        let dataTools: Set<String> = ["news", "weather", "podcast", "calendar", "contacts",
+                                       "reminders", "currency_converter", "notes"]
+        if matchedNames.isDisjoint(with: dataTools) {
+            matchedNames.insert("web_search")
+        }
+
+        let routed = tools.filter { matchedNames.contains($0.name) }
+        print("[ToolRouter] Routed to: \(routed.map { $0.name }.joined(separator: ", "))")
+        return routed
+    }
+
     func generateResponse(prompt: String, history: [Memory]) async throws -> String {
         let systemPrompt = generateSystemPrompt()
-        let allTools = tools
-        print("[ModelManager] Registered \(allTools.count) tools: \(allTools.map { $0.name }.joined(separator: ", "))")
         print("[ModelManager] Prompt: \(prompt)")
+
+        // Route to relevant tools based on keyword matching
+        let routedTools = routeTools(for: prompt)
+        print("[ModelManager] Active tools (\(routedTools.count)): \(routedTools.map { $0.name }.joined(separator: ", "))")
 
         // Extract named entities via NER to help the small on-device model
         let entities = extractEntities(from: prompt)
         var nerHints = ""
         if !entities.places.isEmpty {
-            nerHints += "\nDetected locations: \(entities.places.joined(separator: ", ")). Use these as tool arguments (e.g. locationName for weather)."
+            nerHints += "\nDetected locations: \(entities.places.joined(separator: ", ")). Pass these as tool arguments (e.g. locationName for weather)."
         }
         if !entities.people.isEmpty {
-            nerHints += "\nDetected people: \(entities.people.joined(separator: ", ")). Use these as tool arguments (e.g. name for contacts)."
+            nerHints += "\nDetected people: \(entities.people.joined(separator: ", ")). Pass these as tool arguments (e.g. name for contacts, query for podcast)."
         }
         if !entities.orgs.isEmpty {
             nerHints += "\nDetected organizations: \(entities.orgs.joined(separator: ", "))."
@@ -1665,13 +1756,20 @@ class ModelManager {
             print("[ModelManager] NER:\(nerHints)")
         }
 
-        // Build instructions with brief factual context from history (no tool outputs or errors)
+        // Build instructions
         var instructions = systemPrompt
-        if !nerHints.isEmpty {
-            instructions += "\n\n" + nerHints
+
+        // Tell the model exactly which tool to call
+        if routedTools.count <= 3 {
+            let toolList = routedTools.map { $0.name }.joined(separator: " or ")
+            instructions += "\n\nYou MUST call the \(toolList) tool to answer this question. Do not answer from memory."
         }
+
+        if !nerHints.isEmpty {
+            instructions += "\n" + nerHints
+        }
+
         let relevantHistory = history.suffix(5).filter { memory in
-            // Only include short user/agent messages, skip tool outputs and errors
             let content = memory.content
             return content.count < 300
                 && !content.contains("Error")
@@ -1684,7 +1782,7 @@ class ModelManager {
             instructions += "\n\nRecent context (for reference only — answer the user's NEW message, not these):\n\(context)"
         }
 
-        let session = LanguageModelSession(model: .default, tools: allTools, instructions: instructions)
+        let session = LanguageModelSession(model: .default, tools: routedTools, instructions: instructions)
 
         do {
             let response = try await session.respond(to: prompt)
