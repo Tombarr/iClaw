@@ -24,6 +24,11 @@ let package = Package(
             ],
             path: "Sources/iClaw",
             exclude: ["Resources/Info.plist", "Resources/iClaw.entitlements"]
+        ),
+        .testTarget(
+            name: "iClawTests",
+            dependencies: ["iClaw"],
+            path: "Tests/iClawTests"
         )
     ]
 )
