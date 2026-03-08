@@ -36,6 +36,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
         // Ensure database is initialized
         _ = DatabaseManager.shared
+
+        // Start iMessage poller
+        iMessagePoller.shared.start()
     }
 
     private func setupStatusItem() {
