@@ -21,6 +21,15 @@ class FloatingPanel: NSPanel {
         super.resignKey()
         orderOut(nil)
     }
+
+    // Prevent re-entrant layout that triggers the _NSDetectedLayoutRecursion warning
+    private var isLayingOut = false
+    override func layoutIfNeeded() {
+        guard !isLayingOut else { return }
+        isLayingOut = true
+        super.layoutIfNeeded()
+        isLayingOut = false
+    }
 }
 
 @MainActor
@@ -222,6 +231,7 @@ struct ChatView: View {
     @State private var thinkingPhrase = thinkingPhrases.randomElement()!
     @ObservedObject private var speechManager = SpeechManager.shared
     @ObservedObject private var podcastPlayer = PodcastPlayerManager.shared
+    @State private var currentTask: Task<Void, Never>?
 
     let timer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
     let phraseTimer = Timer.publish(every: 2.0, on: .main, in: .common).autoconnect()
@@ -468,6 +478,12 @@ struct ChatView: View {
                 .padding(.vertical, 16)
                 .background(.black.opacity(0.2))
             }
+
+            // Hidden Escape key handler
+            Button("") { handleEscape() }
+                .keyboardShortcut(.escape, modifiers: [])
+                .frame(width: 0, height: 0)
+                .opacity(0)
         }
     }
 
@@ -496,24 +512,35 @@ struct ChatView: View {
         isThinking = true
         thinkingPhrase = thinkingPhrases.randomElement()!
 
-        Task {
+        currentTask = Task {
             do {
                 let recentMemories = try await DatabaseManager.shared.searchMemories(query: userContent, limit: 5)
                 let response = try await ModelManager.shared.generateResponse(prompt: userContent, history: recentMemories)
+                guard !Task.isCancelled else { return }
                 isThinking = false
                 messages.append(Message(role: "agent", content: response))
 
-                // Save to database
                 let userMemory = Memory(id: nil, role: "user", content: userContent, embedding: nil, created_at: Date(), is_important: false)
                 _ = try await DatabaseManager.shared.saveMemory(userMemory)
 
                 let agentMemory = Memory(id: nil, role: "agent", content: response, embedding: nil, created_at: Date(), is_important: false)
                 _ = try await DatabaseManager.shared.saveMemory(agentMemory)
             } catch {
+                guard !Task.isCancelled else { return }
                 isThinking = false
                 messages.append(Message(role: "agent", content: "Error: \(error.localizedDescription)"))
                 print("Error: \(error)")
             }
+        }
+    }
+
+    private func handleEscape() {
+        if !input.isEmpty {
+            input = ""
+        } else if isThinking {
+            currentTask?.cancel()
+            currentTask = nil
+            isThinking = false
         }
     }
 }

@@ -112,8 +112,13 @@ class LocationManager: NSObject, @preconcurrency CLLocationManagerDelegate {
 
     func getCurrentLocation() async throws -> CLLocation {
         var status = manager.authorizationStatus
+        print("[LocationManager] Current authorization status: \(status.rawValue)")
+
         if status == .notDetermined {
             print("[LocationManager] Requesting location authorization...")
+            // Activate the app so macOS can anchor the permission dialog (LSUIElement apps need this)
+            NSApp.activate(ignoringOtherApps: true)
+
             status = await withCheckedContinuation { continuation in
                 self.authContinuation = continuation
                 manager.requestWhenInUseAuthorization()
@@ -125,6 +130,11 @@ class LocationManager: NSObject, @preconcurrency CLLocationManagerDelegate {
             throw NSError(domain: "LocationManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "Location access denied. Grant permission in System Settings > Privacy > Location Services."])
         }
 
+        guard status == .authorized || status == .authorizedAlways else {
+            throw NSError(domain: "LocationManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "Location authorization not granted (status: \(status.rawValue))."])
+        }
+
+        print("[LocationManager] Requesting location...")
         return try await withCheckedThrowingContinuation { continuation in
             self.locationContinuation = continuation
             manager.requestLocation()
@@ -1550,33 +1560,28 @@ class ModelManager {
 
     func generateResponse(prompt: String, history: [Memory]) async throws -> String {
         let systemPrompt = generateSystemPrompt()
-
-        // Build a proper Transcript from history to keep turns separated
-        var entries: [Transcript.Entry] = []
-
-        // 1. Add System Instructions
-        let instructions = Transcript.Instructions(segments: [.text(Transcript.TextSegment(content: systemPrompt))], toolDefinitions: [])
-        entries.append(.instructions(instructions))
-
-        // 2. Add History as individual turns
-        for memory in history.suffix(10) {
-            let segment = Transcript.Segment.text(Transcript.TextSegment(content: memory.content))
-            if memory.role == "user" {
-                let promptEntry = Transcript.Prompt(segments: [segment])
-                entries.append(.prompt(promptEntry))
-            } else if memory.role == "agent" {
-                let responseEntry = Transcript.Response(assetIDs: [], segments: [segment])
-                entries.append(.response(responseEntry))
-            }
-        }
-
-        let transcript = Transcript(entries: entries)
         let allTools = tools
         print("[ModelManager] Registered \(allTools.count) tools: \(allTools.map { $0.name }.joined(separator: ", "))")
         print("[ModelManager] Prompt: \(prompt)")
-        let session = LanguageModelSession(model: .default, tools: allTools, transcript: transcript)
 
-        // 3. Respond to the latest prompt
+        // Build instructions with brief factual context from history (no tool outputs or errors)
+        var instructions = systemPrompt
+        let relevantHistory = history.suffix(5).filter { memory in
+            // Only include short user/agent messages, skip tool outputs and errors
+            let content = memory.content
+            return content.count < 300
+                && !content.contains("Error")
+                && !content.contains("denied")
+                && !content.contains("PHOTO_CAPTURED")
+                && !content.contains("CURRENT LOCATION")
+        }
+        if !relevantHistory.isEmpty {
+            let context = relevantHistory.map { "[\($0.role)] \($0.content)" }.joined(separator: "\n")
+            instructions += "\n\nRecent context (for reference only — answer the user's NEW message, not these):\n\(context)"
+        }
+
+        let session = LanguageModelSession(model: .default, tools: allTools, instructions: instructions)
+
         do {
             let response = try await session.respond(to: prompt)
             print("[ModelManager] Response: \(response.content.prefix(300))")
@@ -1602,7 +1607,7 @@ class ModelManager {
         ]
         let basePrompt = seedPrompts.randomElement()!
 
-        let prompt = "Greet the user named \(name) in one short sentence. Be sassy and direct. Tone inspiration: '\(basePrompt)'. Output ONLY the greeting itself — no preamble, no quotes, no explanation, no meta-commentary like 'Here is a greeting'. Just the raw greeting sentence."
+        let prompt = "Greet the user named \(name) in one sentence. Be sassy, direct, and mildly unhinged. Tone inspiration: '\(basePrompt)'. Output ONLY the greeting itself — no preamble, no quotes, no explanation, no meta-commentary like 'Here is a greeting'. Just the raw greeting sentence."
 
         let instructions = Transcript.Instructions(segments: [.text(Transcript.TextSegment(content: self.soul))], toolDefinitions: [])
         let transcript = Transcript(entries: [.instructions(instructions)])

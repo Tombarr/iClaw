@@ -40,5 +40,9 @@
     <string>iClaw needs access to your health data to answer health-related questions.</string>
     <key>NSMotionUsageDescription</key>
     <string>iClaw needs motion access to track your daily steps accurately.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>iClaw needs your location to provide local weather and location-aware answers.</string>
+    <key>NSLocationUsageDescription</key>
+    <string>iClaw needs your location to provide local weather and location-aware answers.</string>
 </dict>
 </plist>
