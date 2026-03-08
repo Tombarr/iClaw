@@ -36,7 +36,7 @@ class ModelManager {
     
     private init() {
         if let soulPath = Bundle.main.path(forResource: "SOUL", ofType: "md"),
-           let content = try? String(contentsOfFile: soulPath) {
+           let content = try? String(contentsOfFile: soulPath, encoding: .utf8) {
             self.soul = content
         } else {
             // Fallback soul if not found in bundle

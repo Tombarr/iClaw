@@ -1,6 +1,6 @@
-# OpenClaw Local (for macOS 26+)
+# iClaw Local (for macOS 26+)
 
-**OpenClaw Local** is a lightning-fast, fully-local, native macOS AI agent. Built explicitly for macOS 26+ utilizing Swift 6.2 Strict Concurrency, it leverages Apple's on-device Foundation Models and Neural Engine to provide a private, highly capable assistant that lives completely on your machine.
+**iClaw Local** is a lightning-fast, fully-local, native macOS AI agent. Built explicitly for macOS 26+ utilizing Swift 6.2 Strict Concurrency, it leverages Apple's on-device Foundation Models and Neural Engine to provide a private, highly capable assistant that lives completely on your machine.
 
 ## ✨ Features
 
@@ -14,7 +14,7 @@
 
 ## 🛠️ Built-In Toolbelt
 
-OpenClaw comes pre-packaged with a deep integration into the macOS ecosystem:
+iClaw comes pre-packaged with a deep integration into the macOS ecosystem:
 - Web Search & HTTP Fetch
 - File System Read (Desktop, Downloads, Documents)
 - Semantic Summarization (NaturalLanguage NER)

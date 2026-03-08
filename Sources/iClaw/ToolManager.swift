@@ -75,7 +75,7 @@ class ToolManager {
         // EventKit implementation
         let store = EKEventStore()
         let status = EKEventStore.authorizationStatus(for: .event)
-        if status != .authorized {
+        if status != .fullAccess {
             // Request permission (in real app, this would be an async prompt)
             return "Calendar access not authorized. Please grant permission in System Settings."
         }
@@ -141,7 +141,7 @@ class ToolManager {
         // Check permissions via PermissionsKit if needed (Files and Folders is special)
         // For now, simple read if allowed by sandbox
         let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
-        let content = try String(contentsOf: url)
+        let content = try String(contentsOf: url, encoding: .utf8)
         return "Content of \(path):\n\(content.prefix(1000))..."
     }
     

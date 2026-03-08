@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 @main
-struct OpenClawLocalApp: App {
+struct iClawApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
@@ -12,10 +12,15 @@ struct OpenClawLocalApp: App {
     }
 }
 
+class FloatingPanel: NSPanel {
+    override var canBecomeKey: Bool { return true }
+    override var canBecomeMain: Bool { return true }
+}
+
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     var statusItem: NSStatusItem?
-    var hudWindow: NSPanel?
+    var hudWindow: FloatingPanel?
     var heartbeatTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -30,14 +35,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "brain.head.profile", accessibilityDescription: "OpenClaw Local")
+            button.image = NSImage(systemSymbolName: "brain.head.profile", accessibilityDescription: "iClaw Local")
             button.action = #selector(toggleWindow)
             button.target = self
         }
     }
 
     private func setupHUDWindow() {
-        hudWindow = NSPanel(
+        hudWindow = FloatingPanel(
             contentRect: NSRect(x: 0, y: 0, width: 400, height: 600),
             styleMask: [.nonactivatingPanel, .hudWindow, .fullSizeContentView],
             backing: .buffered,
@@ -129,10 +134,6 @@ struct ChatView: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .stroke(.white.opacity(0.2), lineWidth: 1)
-        }
         .padding(10)
         .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
     }
@@ -143,7 +144,7 @@ struct ChatView: View {
                 .font(.title2)
                 .foregroundStyle(.primary)
             
-            Text("OpenClaw Local")
+            Text("iClaw Local")
                 .font(.headline)
                 .foregroundStyle(.primary)
             
@@ -176,7 +177,7 @@ struct ChatView: View {
                             }
                         
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(message.role == "user" ? "You" : "OpenClaw")
+                            Text(message.role == "user" ? "You" : "iClaw")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             
@@ -198,7 +199,7 @@ struct ChatView: View {
                 .background(.white.opacity(0.1))
             
             HStack(spacing: 12) {
-                TextField("Message OpenClaw...", text: $input)
+                TextField("Message iClaw...", text: $input)
                     .textFieldStyle(.plain)
                     .font(.body)
                 

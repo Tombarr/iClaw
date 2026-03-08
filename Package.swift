@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "OpenClawLocal",
+    name: "iClaw",
     platforms: [
-        .macOS(.v15)
+        .macOS("26.0")
     ],
     products: [
-        .executable(name: "OpenClawLocal", targets: ["OpenClawLocal"])
+        .executable(name: "iClaw", targets: ["iClaw"])
     ],
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.0.0"),
@@ -16,13 +16,13 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "OpenClawLocal",
+            name: "iClaw",
             dependencies: [
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "SwiftSoup", package: "SwiftSoup"),
                 .product(name: "PermissionsKit", package: "PermissionsKit"),
             ],
-            path: "Sources/OpenClawLocal"
+            path: "Sources/iClaw"
         )
     ]
 )

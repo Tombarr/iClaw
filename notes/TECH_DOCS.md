@@ -1,4 +1,4 @@
-# Technical Documentation: OpenClaw Local
+# Technical Documentation: iClaw Local
 
 ## Architecture
 ### UI Layer

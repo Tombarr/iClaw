@@ -1,4 +1,4 @@
-# OpenClaw Local (macOS 26+)
+# iClaw Local (macOS 26+)
 
 A native macOS 26+ app that uses Apple Intelligence (Foundation Models, Neural Engine, etc.) to work as a local AI agent fully on-device and private.
 

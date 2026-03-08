@@ -16,7 +16,7 @@ class SummarizationManager {
         
         var entities: Set<String> = []
         tagger.enumerateTags(in: text.startIndex..<text.endIndex, unit: .word, scheme: .nameType, options: [.omitWhitespace, .omitPunctuation]) { tag, range in
-            if let tag = tag {
+            if tag != nil {
                 entities.insert(String(text[range]))
             }
             return true

@@ -1,7 +1,7 @@
-# Project Notes: OpenClaw Local
+# Project Notes: iClaw Local
 
 ## Project Overview
-OpenClaw Local is a native macOS 26+ AI agent utilizing Apple Intelligence for private, on-device operations. It features a "Liquid Glass" UI, persistent menu bar presence, and a complex memory system with auto-compaction to fit within a 4K context window.
+iClaw Local is a native macOS 26+ AI agent utilizing Apple Intelligence for private, on-device operations. It features a "Liquid Glass" UI, persistent menu bar presence, and a complex memory system with auto-compaction to fit within a 4K context window.
 
 ## Current Status
 - Plan finalized and milestones established.

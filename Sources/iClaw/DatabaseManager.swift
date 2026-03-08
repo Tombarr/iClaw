@@ -11,7 +11,7 @@ class DatabaseManager {
         do {
             let fileManager = FileManager.default
             let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-            let dbFolderURL = appSupportURL.appendingPathComponent("OpenClawLocal", isDirectory: true)
+            let dbFolderURL = appSupportURL.appendingPathComponent("iClaw", isDirectory: true)
             try fileManager.createDirectory(at: dbFolderURL, withIntermediateDirectories: true)
             let dbURL = dbFolderURL.appendingPathComponent("db.sqlite")
             
@@ -42,7 +42,7 @@ class DatabaseManager {
     func saveMemory(_ memory: Memory) async throws -> Memory {
         var memoryWithEmbedding = memory
         // Automatically generate embedding
-        if let vector = await EmbeddingManager.shared.generateEmbedding(for: memory.content) {
+        if let vector = EmbeddingManager.shared.generateEmbedding(for: memory.content) {
             memoryWithEmbedding.embedding = try JSONEncoder().encode(vector)
         }
         

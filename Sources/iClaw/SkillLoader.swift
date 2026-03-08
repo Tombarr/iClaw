@@ -28,7 +28,7 @@ class SkillLoader {
     }
     
     func loadSkill(from url: URL) throws {
-        let content = try String(contentsOf: url)
+        let _ = try String(contentsOf: url, encoding: .utf8)
         // Basic Markdown parsing (regex or manual)
         // For now, assume a specific format for parsing
         
