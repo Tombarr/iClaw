@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>iClaw</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.local.iClaw</string>
+    <key>CFBundleName</key>
+    <string>iClaw</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
+    <key>CFBundleVersion</key>
+    <string>1.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>iClaw needs microphone access to hear you.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>iClaw needs speech recognition to understand you.</string>
+    <key>NSContactsUsageDescription</key>
+    <string>iClaw needs contacts access to personalize responses.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>iClaw needs calendar access to manage events.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>iClaw needs to control Messages.</string>
+</dict>
+</plist>

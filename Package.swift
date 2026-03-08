@@ -22,7 +22,8 @@ let package = Package(
                 .product(name: "SwiftSoup", package: "SwiftSoup"),
                 .product(name: "PermissionsKit", package: "PermissionsKit"),
             ],
-            path: "Sources/iClaw"
+            path: "Sources/iClaw",
+            exclude: ["Resources/Info.plist", "Resources/iClaw.entitlements"]
         )
     ]
 )

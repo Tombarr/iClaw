@@ -21,81 +21,95 @@ class SpeechManager: NSObject, ObservableObject {
     }
     
     func startRecording() {
-        SFSpeechRecognizer.requestAuthorization { authStatus in
-            Task { @MainActor in
-                if authStatus == .authorized {
-                    self.beginRecording()
-                } else {
-                    self.transcription = "Speech recognition not authorized."
-                    self.isRecording = false
-                }
-            }
-        }
+        self.beginRecording()
     }
     
     private func beginRecording() {
         transcription = "Initializing offline speech model..."
         isRecording = true
         
-        recordingTask = Task {
+        // The class itself is marked @MainActor, so tasks created here inherit it.
+        // We explicitly make a non-isolated task for the heavy processing.
+        recordingTask = Task.detached {
             do {
                 let locale = Locale(identifier: "en-US")
                 
-                // Configure offline SpeechTranscriber
+                // Configure offline SpeechTranscriber with volatile results enabled
                 let transcriber = SpeechTranscriber(
                     locale: locale,
                     transcriptionOptions: [],
-                    reportingOptions: [],
+                    reportingOptions: [.volatileResults],
                     attributeOptions: []
                 )
                 
                 // Ensure fully offline approach: Check and download required AssetInventory
                 if let downloader = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-                    self.transcription = "Downloading offline language model. Please wait..."
+                    await MainActor.run {
+                        self.transcription = "Downloading offline language model. Please wait..."
+                    }
                     try await downloader.downloadAndInstall()
                 }
                 
                 let a = SpeechAnalyzer(modules: [transcriber])
-                self.analyzer = a
+                await MainActor.run {
+                    self.analyzer = a
+                }
                 
                 let (stream, continuation) = AsyncStream.makeStream(of: AnalyzerInput.self)
-                self.streamContinuation = continuation
+                await MainActor.run {
+                    self.streamContinuation = continuation
+                }
                 
                 // Listen to results asynchronously
-                self.resultsTask = Task { @MainActor in
-                    var currentText = ""
-                    do {
-                        for try await result in transcriber.results {
-                            let chunk = String(result.text.characters)
-                            currentText += chunk
-                            self.transcription = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
+                await MainActor.run {
+                    self.resultsTask = Task { @MainActor in
+                        var finalizedTranscript = ""
+                        var volatileTranscript = ""
+                        do {
+                            for try await result in transcriber.results {
+                                if result.isFinal {
+                                    volatileTranscript = ""
+                                    finalizedTranscript += String(result.text.characters)
+                                } else {
+                                    volatileTranscript = String(result.text.characters)
+                                }
+                                self.transcription = (finalizedTranscript + volatileTranscript).trimmingCharacters(in: .whitespacesAndNewlines)
+                            }
+                        } catch {
+                            self.transcription = "Error reading speech: \(error.localizedDescription)"
+                            self.isRecording = false
                         }
-                    } catch {
-                        self.transcription = "Error reading speech: \(error.localizedDescription)"
-                        self.isRecording = false
                     }
                 }
                 
-                // Configure AudioEngine
-                let inputNode = self.audioEngine.inputNode
-                let format = inputNode.outputFormat(forBus: 0)
-                
-                inputNode.removeTap(onBus: 0)
-                inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
-                    continuation.yield(AnalyzerInput(buffer: buffer))
+                // Configure AudioEngine must happen on MainActor
+                try await MainActor.run {
+                    let inputNode = self.audioEngine.inputNode
+                    let format = inputNode.outputFormat(forBus: 0)
+                    
+                    inputNode.removeTap(onBus: 0)
+                    
+                    // AVAudioEngine's tap block is called on a background thread.
+                    // We must not capture the continuation in a way that violates isolation,
+                    // but the continuation itself is Sendable.
+                    inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
+                        continuation.yield(AnalyzerInput(buffer: buffer))
+                    }
+                    
+                    self.audioEngine.prepare()
+                    try self.audioEngine.start()
+                    
+                    self.transcription = "Listening..."
                 }
-                
-                self.audioEngine.prepare()
-                try self.audioEngine.start()
-                
-                self.transcription = "Listening..."
                 
                 // Stream audio into the analyzer
                 _ = try await a.analyzeSequence(stream)
                 
             } catch {
-                self.transcription = "Failed to start: \(error.localizedDescription)"
-                self.stopRecording()
+                await MainActor.run {
+                    self.transcription = "Failed to start: \(error.localizedDescription)"
+                    self.stopRecording()
+                }
             }
         }
     }
@@ -107,12 +121,13 @@ class SpeechManager: NSObject, ObservableObject {
         streamContinuation?.finish()
         streamContinuation = nil
         
+        let localAnalyzer = analyzer
         Task {
-            if let a = analyzer {
+            if let a = localAnalyzer {
                 await a.cancelAndFinishNow()
             }
-            analyzer = nil
         }
+        analyzer = nil
         
         recordingTask?.cancel()
         resultsTask?.cancel()
