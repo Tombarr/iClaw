@@ -25,6 +25,9 @@ struct TranscriptAccumulator: Sendable {
 class SpeechManager: NSObject, ObservableObject {
     static let shared = SpeechManager()
 
+    /// Seconds of silence after the last result before auto-confirming.
+    static let silenceTimeoutSeconds: TimeInterval = 2.0
+
     @Published var isRecording = false
     @Published var transcription = ""
 
@@ -34,6 +37,7 @@ class SpeechManager: NSObject, ObservableObject {
 
     private var recordingTask: Task<Void, Never>?
     private var resultsTask: Task<Void, Never>?
+    private var silenceTimer: Task<Void, Never>?
 
     private override init() {
         super.init()
@@ -90,6 +94,7 @@ class SpeechManager: NSObject, ObservableObject {
 
                             await MainActor.run {
                                 SpeechManager.shared.transcription = combined
+                                SpeechManager.shared.resetSilenceTimer()
                             }
                         }
                     } catch {
@@ -144,6 +149,9 @@ class SpeechManager: NSObject, ObservableObject {
     }
     
     func stopRecording() {
+        silenceTimer?.cancel()
+        silenceTimer = nil
+
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
 
@@ -163,5 +171,14 @@ class SpeechManager: NSObject, ObservableObject {
         resultsTask?.cancel()
 
         isRecording = false
+    }
+
+    private func resetSilenceTimer() {
+        silenceTimer?.cancel()
+        silenceTimer = Task {
+            try? await Task.sleep(for: .seconds(Self.silenceTimeoutSeconds))
+            guard !Task.isCancelled, self.isRecording else { return }
+            self.stopRecording()
+        }
     }
 }

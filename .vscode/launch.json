@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:iClaw}",
+            "name": "Debug iClaw",
+            "target": "iClaw",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug iClaw"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:iClaw}",
+            "name": "Release iClaw",
+            "target": "iClaw",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release iClaw"
+        }
+    ]
+}
