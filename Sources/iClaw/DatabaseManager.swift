@@ -120,13 +120,15 @@ class DatabaseManager {
 }
 
 struct Memory: Codable, FetchableRecord, MutablePersistableRecord {
+    static let databaseTableName = "memories"
+
     var id: Int64?
     var role: String
     var content: String
     var embedding: Data?
     var created_at: Date
     var is_important: Bool
-    
+
     enum CodingKeys: String, CodingKey {
         case id, role, content, embedding, created_at, is_important
     }

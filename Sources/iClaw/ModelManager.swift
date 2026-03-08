@@ -1,5 +1,6 @@
 import Foundation
 import Contacts
+import FoundationModels
 
 @MainActor
 class MeCardManager {
@@ -58,14 +59,22 @@ class ModelManager {
     
     func generateResponse(prompt: String, history: [Memory]) async throws -> String {
         let systemPrompt = generateSystemPrompt()
-        
-        // Placeholder for the actual LLM call.
-        // In a real scenario, this would interface with MLX, CoreML, or the Apple Intelligence API.
-        
-        print("System Prompt: \(systemPrompt)")
-        print("User Prompt: \(prompt)")
-        
-        // Simulating a response for now
-        return "I've heard you, \(MeCardManager.shared.userName). I'm looking into it locally."
+
+        // Build conversation context from memory history
+        var contextMessages = ""
+        for memory in history.suffix(10) {
+            contextMessages += "\(memory.role): \(memory.content)\n"
+        }
+
+        let fullPrompt: String
+        if contextMessages.isEmpty {
+            fullPrompt = prompt
+        } else {
+            fullPrompt = "Previous context:\n\(contextMessages)\nUser: \(prompt)"
+        }
+
+        let session = LanguageModelSession(instructions: systemPrompt)
+        let response = try await session.respond(to: fullPrompt)
+        return response.content
     }
 }

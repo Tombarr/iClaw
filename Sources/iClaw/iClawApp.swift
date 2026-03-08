@@ -242,7 +242,8 @@ struct ChatView: View {
         
         Task {
             do {
-                let response = try await ModelManager.shared.generateResponse(prompt: userContent, history: [])
+                let recentMemories = try await DatabaseManager.shared.searchMemories(query: userContent, limit: 5)
+                let response = try await ModelManager.shared.generateResponse(prompt: userContent, history: recentMemories)
                 messages.append(Message(role: "agent", content: response))
                 
                 // Save to database
