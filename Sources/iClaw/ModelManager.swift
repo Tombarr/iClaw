@@ -1776,7 +1776,7 @@ class ModelManager {
         // Tell the model exactly which tool to call
         if routedTools.count <= 3 {
             let toolList = routedTools.map { $0.name }.joined(separator: " or ")
-            instructions += "\n\nYou MUST call the \(toolList) tool to answer this question. Do not answer from memory."
+            instructions += "\n\nYou MUST call the \(toolList) tool to answer this question. Do not answer from memory. NEVER output JSON or function call syntax as text — use the tool calling mechanism instead."
         }
 
         if !nerHints.isEmpty {
@@ -1800,8 +1800,30 @@ class ModelManager {
 
         do {
             let response = try await session.respond(to: prompt)
-            print("[ModelManager] Response: \(response.content.prefix(300))")
-            return response.content
+            var content = response.content
+            print("[ModelManager] Response: \(content.prefix(300))")
+
+            // Detect when the model dumps raw JSON tool calls as text instead of invoking tools
+            if content.contains("\"name\"") && content.contains("\"arguments\"") {
+                print("[ModelManager] Detected raw JSON tool call in response — retrying")
+                // Retry with an even stronger instruction
+                let retrySession = LanguageModelSession(
+                    model: .default,
+                    tools: routedTools,
+                    instructions: instructions + "\n\nIMPORTANT: You just failed by outputting JSON text. USE the tool calling mechanism. Do NOT write JSON."
+                )
+                let retryResponse = try await retrySession.respond(to: prompt)
+                content = retryResponse.content
+                print("[ModelManager] Retry response: \(content.prefix(300))")
+
+                // If it still outputs JSON, strip it and return a clean message
+                if content.contains("\"name\"") && content.contains("\"arguments\"") {
+                    print("[ModelManager] Retry still produced JSON — falling back")
+                    return "I tried to use a tool but the on-device model is having trouble. Try rephrasing your question."
+                }
+            }
+
+            return content
         } catch {
             print("[ModelManager] Error: \(error)")
             return "An error occurred: \(error.localizedDescription)"
