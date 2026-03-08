@@ -16,6 +16,10 @@
     <string>????</string>
     <key>CFBundleVersion</key>
     <string>1.0</string>
+    <key>CFBundleIconFile</key>
+    <string>iClaw</string>
+    <key>CFBundleIconName</key>
+    <string>iClaw</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSMicrophoneUsageDescription</key>
@@ -34,5 +38,7 @@
     <string>iClaw needs access to your health data to answer health-related questions.</string>
     <key>NSHealthUpdateUsageDescription</key>
     <string>iClaw needs access to your health data to answer health-related questions.</string>
+    <key>NSMotionUsageDescription</key>
+    <string>iClaw needs motion access to track your daily steps accurately.</string>
 </dict>
 </plist>

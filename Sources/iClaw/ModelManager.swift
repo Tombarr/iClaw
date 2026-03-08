@@ -11,6 +11,7 @@ import PDFKit
 import UniformTypeIdentifiers
 import HealthKit
 import AVFoundation
+import CoreMotion
 
 @MainActor
 class CameraManager: NSObject, AVCapturePhotoCaptureDelegate {
@@ -1131,6 +1132,68 @@ struct CurrencyTool: Tool {
     }
 }
 
+// MARK: - News Tool
+
+@Generable
+struct NewsInput: ConvertibleFromGeneratedContent {
+    @Guide(description: "Optional category slug to filter stories. Available categories: 'human-development', 'planet-climate', 'existential-threats', 'science-technology'.")
+    var slug: String?
+}
+
+struct NewsTool: Tool {
+    typealias Arguments = NewsInput
+    typealias Output = String
+
+    let name = "news"
+    let description = "Fetch recent news stories focused on humanity's progress and challenges. Supports filtering by issue area: human development, climate, existential risks, and science/tech."
+    var parameters: GenerationSchema { Arguments.generationSchema }
+
+    func call(arguments input: NewsInput) async throws -> String {
+        var urlString = "https://actually-relevant-api.onrender.com/api/stories"
+        if let slug = input.slug?.lowercased().trimmingCharacters(in: .whitespaces), !slug.isEmpty {
+            urlString += "?slug=\(slug)"
+        }
+
+        guard let url = URL(string: urlString) else { return "Invalid news query." }
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            
+            struct Story: Codable {
+                let title: String
+                let description: String?
+                let url: String?
+                let category: String?
+                let publishedAt: String?
+            }
+
+            let stories = try JSONDecoder().decode([Story].self, from: data)
+            
+            if stories.isEmpty {
+                return "No recent stories found\(input.slug != nil ? " for category '\(input.slug!)'" : "")."
+            }
+
+            var result = "Recent stories:\n"
+            for story in stories.prefix(5) {
+                result += "- \(story.title)"
+                if let category = story.category {
+                    result += " [\(category)]"
+                }
+                if let description = story.description, !description.isEmpty {
+                    result += ": \(description)"
+                }
+                if let url = story.url {
+                    result += " (\(url))"
+                }
+                result += "\n"
+            }
+            return result
+        } catch {
+            return "Error fetching news: \(error.localizedDescription)"
+        }
+    }
+}
+
 // MARK: - HealthKit Tool
 
 @Generable
@@ -1197,18 +1260,20 @@ struct HealthTool: Tool {
 
     /// Returns nil on success, or an error message string if authorization failed.
     private func ensureAuthorization(for types: Set<HKSampleType>) async -> String? {
-        // Check if all types are already authorized (sharingDenied means "not determined or denied for read",
-        // but HealthKit intentionally hides read denial — so we request if not sharingAuthorized for any type,
-        // which is safe because re-requesting for already-authorized types is a no-op).
-        let needsRequest = types.contains { type in
-            store.authorizationStatus(for: type) != .sharingAuthorized
+        // Request authorization
+        do {
+            try await store.requestAuthorization(toShare: [], read: types)
+        } catch {
+            return "Health access denied. Grant permission in System Settings > Privacy > Health."
         }
 
-        if needsRequest {
-            do {
-                try await store.requestAuthorization(toShare: [], read: types)
-            } catch {
-                return "Health access denied. Grant permission in System Settings > Privacy > Health."
+        // Specifically for steps, also check Motion & Fitness if possible
+        if types.contains(HKQuantityType(.stepCount)) {
+            let pedometer = CMPedometer()
+            if CMPedometer.isStepCountingAvailable() {
+                let now = Date()
+                // Just trigger the prompt, we don't need the result
+                pedometer.queryPedometerData(from: now.addingTimeInterval(-1), to: now) { _, _ in }
             }
         }
 
@@ -1445,6 +1510,7 @@ class ModelManager {
             CurrencyTool(),
             CameraTool(),
             HealthTool(),
+            NewsTool(),
         ]
     }
 

@@ -23,7 +23,19 @@ let package = Package(
                 .product(name: "PermissionsKit", package: "PermissionsKit"),
             ],
             path: "Sources/iClaw",
-            exclude: ["Resources/Info.plist", "Resources/iClaw.entitlements"]
+            exclude: ["Resources/Info.plist", "Resources/iClaw.entitlements"],
+            resources: [
+                .copy("Resources/Assets.car"),
+                .copy("Resources/iClaw.icns"),
+            ],
+            linkerSettings: [
+                .unsafeFlags([
+                    "-Xlinker", "-sectcreate",
+                    "-Xlinker", "__TEXT",
+                    "-Xlinker", "__info_plist",
+                    "-Xlinker", "Sources/iClaw/Resources/Info.plist"
+                ])
+            ]
         ),
         .testTarget(
             name: "iClawTests",
