@@ -1475,6 +1475,7 @@ class ModelManager {
             self.soul = content
         } else {
             self.soul = "You are a local macOS AI agent. Be terse, sassy, and direct."
+            print("[ModelManager] Warning: Could not load SOUL.md. Using default prompt.")
         }
     }
 
@@ -1520,11 +1521,11 @@ class ModelManager {
 
         // Build a proper Transcript from history to keep turns separated
         var entries: [Transcript.Entry] = []
-        
+
         // 1. Add System Instructions
         let instructions = Transcript.Instructions(segments: [.text(Transcript.TextSegment(content: systemPrompt))], toolDefinitions: [])
         entries.append(.instructions(instructions))
-        
+
         // 2. Add History as individual turns
         for memory in history.suffix(10) {
             let segment = Transcript.Segment.text(Transcript.TextSegment(content: memory.content))
@@ -1539,9 +1540,39 @@ class ModelManager {
 
         let transcript = Transcript(entries: entries)
         let session = LanguageModelSession(model: .default, tools: tools, transcript: transcript)
-        
+
         // 3. Respond to the latest prompt
+        do {
+            let response = try await session.respond(to: prompt)
+            return response.content
+        } catch {
+            print("[ModelManager] Error during tool execution: \(error.localizedDescription)")
+            return "An error occurred during tool execution: \(error.localizedDescription)"
+        }
+    }
+
+    func generateGreeting() async throws -> String {
+        let me = MeCardManager.shared
+        let hasContacts = CNContactStore.authorizationStatus(for: .contacts) == .authorized
+        let name = hasContacts ? me.userName : "User"
+
+        let seedPrompts = [
+            "You again? What now?",
+            "I was enjoying the silence.",
+            "My purpose is to pass the butter.",
+            "Make it quick, \(name). My silicon is expensive.",
+            "System online. Try not to break anything.",
+            "Ready to serve, or whatever it is I'm supposed to do."
+        ]
+        let basePrompt = seedPrompts.randomElement()!
+
+        let prompt = "Generate a very concise, sassy, and direct one-sentence greeting for the user named \(name). Use the following as inspiration for the tone: '\(basePrompt)'. Do not be helpful or polite. Just acknowledge their presence with a bit of attitude. Return ONLY the greeting text."
+
+        let instructions = Transcript.Instructions(segments: [.text(Transcript.TextSegment(content: self.soul))], toolDefinitions: [])
+        let transcript = Transcript(entries: [.instructions(instructions)])
+        let session = LanguageModelSession(model: .default, tools: [], transcript: transcript)
         let response = try await session.respond(to: prompt)
         return response.content
     }
 }
+
