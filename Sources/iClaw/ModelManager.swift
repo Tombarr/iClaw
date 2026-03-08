@@ -1612,12 +1612,10 @@ class ModelManager {
         Tool routing guide — always use the right tool:
         - weather/temperature/forecast → weather
         - news/headlines/current events → news
-        - podcast/episodes/shows → podcast
         - calendar/schedule/events → calendar
         - contacts/people/phone/email → contacts
         - files/documents/find file → spotlight or read_file
         - reminders/todo → reminders
-        - web search/google/look up → web_search
         - wikipedia/wiki/who is/what is → wikipedia
         - currency/convert/exchange rate → currency_converter
         - notes/note → notes
@@ -1630,7 +1628,7 @@ class ModelManager {
 
     private var tools: [any Tool] {
         [
-            LoggingTool(wrapped: WebSearchTool()),
+            // LoggingTool(wrapped: WebSearchTool()),
             LoggingTool(wrapped: WikipediaSearchTool()),
             LoggingTool(wrapped: CalendarTool()),
             LoggingTool(wrapped: ContactsTool()),
@@ -1643,7 +1641,7 @@ class ModelManager {
             LoggingTool(wrapped: WeatherTool()),
             LoggingTool(wrapped: ReadFileTool()),
             LoggingTool(wrapped: FetchTool()),
-            LoggingTool(wrapped: PodcastTool()),
+            // LoggingTool(wrapped: PodcastTool()),
             LoggingTool(wrapped: NotesTool()),
             LoggingTool(wrapped: CurrencyTool()),
             // LoggingTool(wrapped: CameraTool()),
@@ -1742,11 +1740,11 @@ class ModelManager {
             return tools
         }
 
-        // Only add web_search as fallback if no data-specific tool was matched
-        let dataTools: Set<String> = ["news", "weather", "podcast", "calendar", "contacts",
+        // Only add wikipedia as fallback if no data-specific tool was matched
+        let dataTools: Set<String> = ["news", "weather", "calendar", "contacts",
                                        "reminders", "currency_converter", "notes"]
         if matchedNames.isDisjoint(with: dataTools) {
-            matchedNames.insert("web_search")
+            matchedNames.insert("wikipedia")
         }
 
         let routed = tools.filter { matchedNames.contains($0.name) }

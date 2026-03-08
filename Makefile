@@ -13,9 +13,15 @@ DMG         = .build/iClaw.dmg
 
 build: icon
 	swift build
-	@mkdir -p $(DEBUG_APP)/Contents/Resources
+	@mkdir -p $(DEBUG_APP)/Contents/MacOS $(DEBUG_APP)/Contents/Resources
+	@cp -f .build/arm64-apple-macosx/debug/iClaw $(DEBUG_APP)/Contents/MacOS/iClaw
+	@cp -f $(RESOURCES)/Info.plist $(DEBUG_APP)/Contents/Info.plist
 	@cp -f $(ICON_BUILD)/Assets.car $(DEBUG_APP)/Contents/Resources/
 	@cp -f $(ICON_BUILD)/iClaw.icns $(DEBUG_APP)/Contents/Resources/
+	@# Copy SwiftPM resource bundle if present
+	@BUNDLE=$$(find .build/arm64-apple-macosx/debug -name "iClaw_iClaw.bundle" -type d 2>/dev/null | head -1); \
+		if [ -n "$$BUNDLE" ]; then cp -R "$$BUNDLE" $(DEBUG_APP)/Contents/Resources/; fi
+	@codesign --force --sign - --entitlements $(ENTITLEMENTS) --deep $(DEBUG_APP)
 	@echo "Debug build complete."
 
 run: build
@@ -33,8 +39,7 @@ release: icon
 	@# Copy SwiftPM resource bundle if present
 	@BUNDLE=$$(find .build/arm64-apple-macosx/release -name "iClaw_iClaw.bundle" -type d 2>/dev/null | head -1); \
 		if [ -n "$$BUNDLE" ]; then cp -R "$$BUNDLE" $(RELEASE_APP)/Contents/Resources/; fi
-	@# Ad-hoc sign without sandbox (sandbox requires a Developer ID)
-	@codesign --force --sign - --deep $(RELEASE_APP)
+	@codesign --force --sign - --entitlements $(ENTITLEMENTS) --deep $(RELEASE_APP)
 	@echo "Release build complete: $(RELEASE_APP)"
 
 run-release: release
