@@ -266,7 +266,18 @@ dmg: release
 	@mkdir -p .build/dmg-staging
 	@cp -R $(XCODE_APP_REL) .build/dmg-staging/
 	@ln -s /Applications .build/dmg-staging/Applications
-	@hdiutil create -volname "iClaw" -srcfolder .build/dmg-staging -ov -format UDZO $(DMG)
+	@# Let Spotlight/fseventsd settle on the freshly-copied bundle —
+	@# without this, hdiutil can fail with "Resource busy" on CI runners.
+	@sync
+	@for attempt in 1 2 3; do \
+		if hdiutil create -volname "iClaw" -srcfolder .build/dmg-staging -ov -format UDZO $(DMG); then \
+			break; \
+		fi; \
+		echo "hdiutil create failed (attempt $$attempt), waiting..."; \
+		hdiutil detach /Volumes/iClaw 2>/dev/null || true; \
+		[ $$attempt -eq 3 ] && exit 1; \
+		sleep $$((attempt * 5)); \
+	done
 	@echo "DMG created: $(DMG)"
 
 # --- MAS ---
