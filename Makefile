@@ -201,6 +201,7 @@ run: build
 release: stamp-version safari-extension
 	xcodebuild $(XCODE_COMMON) -configuration Release \
 		$(XCODE_VERSION_FLAGS) \
+		CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
 		-destination "platform=macOS,arch=arm64" -quiet
 	@# Embed Safari extension (built separately to avoid signing conflicts)
 	@mkdir -p $(XCODE_APP_REL)/Contents/PlugIns
@@ -269,6 +270,7 @@ dmg: release
 mas: stamp-version safari-extension
 	xcodebuild $(XCODE_COMMON) -configuration Release \
 		$(XCODE_VERSION_FLAGS) \
+		CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
 		"SWIFT_ACTIVE_COMPILATION_CONDITIONS=\$$(inherited) MAS_BUILD" \
 		-destination "platform=macOS,arch=arm64" -quiet
 	@# Embed Safari extension
